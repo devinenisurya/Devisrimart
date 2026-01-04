@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEVI SRI MART | POS & Inventory</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Ramabhadra&display=swap" rel="stylesheet">
+    <style>
+        .telugu { font-family: 'Ramabhadra', sans-serif; }
+        .active-tab { border-bottom: 4px solid #ea580c; color: #ea580c; font-weight: bold; background: #fff7ed; }
+        @media print { .no-print { display: none !important; } .print-only { display: block !important; } }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        @keyframes slideIn { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-slide { animation: slideIn 0.5s ease-out; }
+        .pay-active { border-color: #ea580c; background-color: #ea580c; color: white; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <div id="lowStockNotify" class="fixed top-5 left-1/2 transform -translate-x-1/2 z-[200] hidden no-print">
+        <div class="bg-red-600 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 animate-slide">
+            <span class="text-2xl">⚠️</span>
+            <div>
+                <p class="font-black text-sm uppercase">Stock Alert</p>
+                <p id="lowStockText" class="text-xs">Some items are running low!</p>
+            </div>
+            <button onclick="closeNotify()" class="ml-4 font-bold text-lg">&times;</button>
+        </div>
+    </div>
+
+    <div id="salesPage">
+        <header class="bg-white border-b-4 border-orange-600 p-4 shadow-sm no-print">
+            <div class="container mx-auto flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <div class="bg-orange-600 text-white p-3 font-black text-2xl rounded-lg shadow-lg">DSM</div>
+                    <div>
+                        <h1 class="text-2xl font-black text-gray-800 tracking-tighter uppercase">Devi Sri Mart</h1>
+                        <h2 class="text-md telugu text-orange-600 font-bold text-sm">దేవి శ్రీ మార్ట్</h2>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="showReports()" class="bg-blue-600 text-white px-5 py-2 rounded-full font-bold text-sm hover:bg-blue-700 transition shadow-lg">📊 REPORTS</button>
+                    <button onclick="toggleAdmin()" class="bg-gray-800 text-white px-5 py-2 rounded-full font-bold text-sm hover:bg-black transition shadow-lg">⚙ STOCK MGMT</button>
+                </div>
+            </div>
+        </header>
+
+        <nav class="bg-white shadow-sm sticky top-0 z-40 no-print border-b overflow-hidden">
+            <div class="container mx-auto flex overflow-x-auto whitespace-nowrap px-4 no-scrollbar">
+                <button onclick="filterCategory('All')" id="tab-All" class="px-6 py-4 active-tab transition">ALL ITEMS</button>
+                <button onclick="filterCategory('Paints')" id="tab-Paints" class="px-6 py-4 border-b-4 border-transparent">PAINTS & FEVICOL</button>
+                <button onclick="filterCategory('Electrical')" id="tab-Electrical" class="px-6 py-4 border-b-4 border-transparent">ELECTRICAL & SWITCHES</button>
+                <button onclick="filterCategory('Sanitary')" id="tab-Sanitary" class="px-6 py-4 border-b-4 border-transparent">SANITARY</button>
+                <button onclick="filterCategory('Motors')" id="tab-Motors" class="px-6 py-4 border-b-4 border-transparent">KUMAR MOTORS</button>
+                <button onclick="filterCategory('Hardware')" id="tab-Hardware" class="px-6 py-4 border-b-4 border-transparent">HARDWARE & HANDLES</button>
+            </div>
+        </nav>
+
+        <div class="container mx-auto flex flex-col lg:flex-row gap-8 p-4 mt-4">
+            <main class="lg:w-2/3 no-print">
+                <input type="text" id="barcodeScanner" autofocus placeholder="🔍 Search product or scan barcode..." 
+                       class="w-full p-5 border-2 border-orange-100 rounded-2xl shadow-inner text-lg focus:border-orange-500 outline-none bg-white mb-6 transition">
+                <div id="productGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </main>
+
+            <aside class="lg:w-1/3 no-print">
+                <div class="bg-white p-6 rounded-3xl shadow-2xl border border-gray-100 sticky top-32">
+                    <div class="text-center border-b pb-3 mb-4"><h3 class="text-xl font-black text-gray-800 tracking-widest">CART</h3></div>
+                    <div id="cartItems" class="space-y-3 mb-6 min-h-[250px] max-h-[400px] overflow-y-auto pr-2">
+                        <p class="text-center text-gray-300 italic mt-10 text-sm">Cart is empty</p>
+                    </div>
+                    <div class="bg-gray-50 p-5 rounded-2xl space-y-4 border">
+                        <div class="flex justify-between text-gray-600 font-bold"><span>Subtotal</span><span id="subTotal">₹0.00</span></div>
+                        <div class="flex justify-between items-center text-red-600 font-black">
+                            <span>Discount %</span>
+                            <input type="number" id="discountInput" value="0" min="0" oninput="calculateTotal()" class="w-16 p-1 border rounded text-center outline-none">
+                        </div>
+                        <div class="flex justify-between text-3xl font-black pt-3 border-t-2 border-dashed text-gray-900 uppercase">
+                            <span>Total</span><span id="grandTotal">₹0.00</span>
+                        </div>
+                    </div>
+                    <button onclick="goToPayment()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-xl shadow-lg mt-4 transition transform active:scale-95">PROCEED TO PAYMENT</button>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <div id="paymentPage" class="hidden min-h-screen bg-gray-100 p-4 no-print animate-slide">
+        <div class="max-w-4xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden mt-10">
+            <div class="flex flex-col md:flex-row">
+                <div class="md:w-1/3 bg-gray-800 text-white p-8">
+                    <button onclick="backToSales()" class="text-gray-400 mb-6 flex items-center gap-2 hover:text-white">← Back to Cart</button>
+                    <h2 class="text-2xl font-black mb-6 border-b border-gray-700 pb-2">BILL SUMMARY</h2>
+                    <div id="paymentSummaryList" class="space-y-4 mb-10 text-sm opacity-80 max-h-[300px] overflow-y-auto pr-2"></div>
+                    <div class="border-t border-gray-700 pt-4">
+                        <p class="text-gray-400 uppercase text-xs font-bold">Total Payable</p>
+                        <p id="paymentTotalDisplay" class="text-4xl font-black text-orange-500">₹0.00</p>
+                    </div>
+                </div>
+
+                <div class="md:w-2/3 p-8">
+                    <h2 class="text-3xl font-black mb-8 text-gray-800 uppercase">Select Payment Mode</h2>
+                    
+                    <div class="grid grid-cols-3 gap-4 mb-10">
+                        <button onclick="setPaymentMode('Cash')" id="payCashBtn" class="pay-btn pay-active border-4 p-6 rounded-3xl flex flex-col items-center gap-2 transition font-black">
+                            <span class="text-2xl">💵</span> CASH
+                        </button>
+                        <button onclick="setPaymentMode('UPI')" id="payUPIBtn" class="pay-btn border-4 p-6 rounded-3xl flex flex-col items-center gap-2 transition font-black">
+                            <span class="text-2xl">📱</span> UPI / QR
+                        </button>
+                        <button onclick="setPaymentMode('Credit')" id="payCreditBtn" class="pay-btn border-4 p-6 rounded-3xl flex flex-col items-center gap-2 transition font-black">
+                            <span class="text-2xl">💳</span> CREDIT
+                        </button>
+                    </div>
+
+                    <div id="cashDetails" class="space-y-6">
+                        <div class="bg-blue-50 p-6 rounded-3xl border-2 border-blue-100">
+                            <p class="text-blue-600 font-bold mb-3 uppercase text-xs">Cash Calculator</p>
+                            <input type="number" id="cashReceived" placeholder="Amount Given by Customer..." oninput="updateChange()" 
+                                   class="w-full p-4 border-4 border-white rounded-2xl text-2xl font-black outline-none focus:border-blue-400 shadow-sm mb-4">
+                            
+                            <p class="text-gray-400 font-bold text-xs mb-2">QUICK SUGGESTIONS:</p>
+                            <div id="cashSuggestions" class="flex gap-2 overflow-x-auto no-scrollbar pb-2"></div>
+                        </div>
+
+                        <div class="flex justify-between items-center bg-gray-900 text-white p-6 rounded-3xl shadow-xl">
+                            <span class="text-lg font-bold opacity-70 italic">Return to Customer:</span>
+                            <span id="paymentChangeDisplay" class="text-4xl font-black text-green-400">₹0</span>
+                        </div>
+                    </div>
+
+                    <button onclick="finalizeSale()" class="w-full bg-green-600 hover:bg-green-700 text-white py-6 rounded-3xl mt-10 font-black text-2xl shadow-2xl transition transform active:scale-95">FINALIZE & PRINT BILL</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="hidden print-only p-8" id="printSection">
+        <div class="text-center border-b-2 border-black pb-4 mb-4">
+            <h1 class="text-3xl font-black uppercase">DEVI SRI MART</h1>
+            <p class="telugu text-xl font-bold">దేవి శ్రీ మార్ట్</p>
+            <p class="text-sm mt-1">Quality Paints & Hardware | Andhra Pradesh</p>
+        </div>
+        <div id="printItemsList" class="mb-4"></div>
+        <div class="border-t-2 border-black pt-4 text-right space-y-1">
+            <p id="printSubtotal"></p>
+            <p id="printDiscount"></p>
+            <p id="printPayMode" class="font-bold"></p>
+            <p id="printTotal" class="text-2xl font-black"></p>
+        </div>
+        <div class="text-center mt-10 italic text-xs">Thank you! Visit again.</div>
+    </div>
+
+    <div id="reportsModal" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-[100] no-print backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="flex justify-between items-center mb-6 border-b pb-4">
+                <h2 class="text-2xl font-black italic">Financial & Stock Reports</h2>
+                <div class="flex gap-2">
+                    <button onclick="downloadCSV()" class="bg-green-600 text-white px-4 py-2 rounded-full font-bold text-xs shadow">📥 EXPORT CSV</button>
+                    <button onclick="closeReports()" class="bg-red-100 text-red-600 px-4 py-2 rounded-full font-bold text-xs">✕ CLOSE</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-orange-50 p-4 rounded-2xl border border-orange-200 text-center"><p class="text-[10px] font-bold text-orange-600 uppercase italic font-black">Total Sales</p><h3 id="todayTotal" class="text-xl font-black text-orange-700">₹0</h3></div>
+                <div class="bg-green-50 p-4 rounded-2xl border border-green-200 text-center"><p class="text-[10px] font-bold text-green-600 uppercase font-black">Cash Box</p><h3 id="cashTotal" class="text-xl font-black text-green-700">₹0</h3></div>
+                <div class="bg-blue-50 p-4 rounded-2xl border border-blue-200 text-center"><p class="text-[10px] font-bold text-blue-600 uppercase font-black">UPI Total</p><h3 id="upiTotal" class="text-xl font-black text-blue-700">₹0</h3></div>
+                <div class="bg-purple-50 p-4 rounded-2xl border border-purple-200 text-center"><p class="text-[10px] font-bold text-purple-600 uppercase font-black">Items Sold</p><h3 id="itemsSoldTotal" class="text-xl font-black text-purple-700">0</h3></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 font-black text-sm uppercase">
+                <div><h4 class="mb-4 text-gray-700 border-l-4 border-orange-500 pl-2">Inventory Status</h4><div id="inventoryReport" class="space-y-2 max-h-60 overflow-y-auto pr-2"></div></div>
+                <div><h4 class="mb-4 text-gray-700 border-l-4 border-blue-500 pl-2">Sales Log</h4><div id="salesLog" class="space-y-2 max-h-60 overflow-y-auto pr-2 italic text-gray-400"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="adminModal" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-[100] no-print backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-3xl max-w-lg w-full shadow-2xl">
+            <div class="flex justify-between items-center mb-6 border-b pb-4"><h2 class="text-2xl font-black italic">Manager Portal</h2><button onclick="toggleAdmin()" class="text-gray-400 text-2xl">&times;</button></div>
+            <div class="space-y-4">
+                <div class="bg-red-50 p-4 rounded-xl border border-red-100 flex gap-2"><input type="text" id="del_barcode" placeholder="Barcode to Delete" class="flex-1 border p-2 rounded-lg text-sm outline-none"><button onclick="deleteProduct()" class="bg-red-500 text-white px-4 py-2 rounded-lg text-xs font-bold">DELETE</button></div>
+                <select id="in_category" class="w-full border-2 p-3 rounded-xl bg-gray-50 font-bold outline-none"><option>Paints</option><option>Electrical</option><option>Sanitary</option><option>Motors</option><option>Hardware</option></select>
+                <input type="text" id="in_barcode" placeholder="Barcode / Code" class="w-full border-2 p-3 rounded-xl outline-none"><input type="text" id="in_name_en" placeholder="English Name" class="w-full border-2 p-3 rounded-xl outline-none"><input type="text" id="in_name_te" placeholder="Telugu Name" class="telugu w-full border-2 p-3 rounded-xl outline-none">
+                <div class="grid grid-cols-2 gap-4"><input type="number" id="in_price" placeholder="Price (₹)" class="w-full border-2 p-3 rounded-xl outline-none"><input type="number" id="in_stock" placeholder="Stock Qty" class="w-full border-2 p-3 rounded-xl outline-none"></div>
+                <button onclick="addNewProduct()" class="w-full bg-orange-600 text-white py-4 rounded-xl font-black text-lg hover:bg-orange-700 transition">SAVE PRODUCT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // MASTER DATA
+        const initialInventory = [
+            { category: 'Motors', barcode: 'M101', name_en: 'Kumar Piston Pump 1HP', name_te: 'కుమార్ పిస్టన్ పంప్', price: 14500, stock: 10 },
+            { category: 'Sanitary', barcode: 'S303', name_en: 'Western Commode', name_te: 'వెస్ట్రన్ కమోడ్', price: 6800, stock: 4 },
+            { category: 'Electrical', barcode: 'E101', name_en: 'Modular Switch 6A', name_te: 'మోడ్యులర్ స్విచ్ 6A', price: 45, stock: 200 },
+            { category: 'Paints', barcode: 'P201', name_en: 'Sandpaper (Rough)', name_te: 'ఉప్పు కాగితం', price: 15, stock: 100 }
+        ];
+
+        let inventory = JSON.parse(localStorage.getItem('DSM_Stock')) || initialInventory;
+        let salesHistory = JSON.parse(localStorage.getItem('DSM_Sales')) || [];
+        let cart = [];
+        let currentCategory = 'All';
+        let currentPaymentMode = 'Cash';
+
+        // --- NAVIGATION ---
+        function goToPayment() {
+            if(cart.length === 0) return alert("Cart is empty!");
+            document.getElementById('salesPage').classList.add('hidden');
+            document.getElementById('paymentPage').classList.remove('hidden');
+            updatePaymentSummary();
+            setPaymentMode('Cash');
+        }
+
+        function backToSales() {
+            document.getElementById('salesPage').classList.remove('hidden');
+            document.getElementById('paymentPage').classList.add('hidden');
+        }
+
+        // --- BILLING LOGIC ---
+        function calculateTotal() {
+            const sub = cart.reduce((s, i) => s + (i.price * i.qty), 0);
+            const disc = parseFloat(document.getElementById('discountInput').value) || 0;
+            const final = Math.round(sub - (sub * (disc/100)));
+            document.getElementById('subTotal').innerText = "₹" + sub.toLocaleString();
+            document.getElementById('grandTotal').innerText = "₹" + final.toLocaleString();
+        }
+
+        function setPaymentMode(mode) {
+            currentPaymentMode = mode;
+            document.querySelectorAll('.pay-btn').forEach(btn => btn.classList.remove('pay-active'));
+            const id = mode === 'Cash' ? 'payCashBtn' : (mode === 'UPI' ? 'payUPIBtn' : 'payCreditBtn');
+            document.getElementById(id).classList.add('pay-active');
+            
+            document.getElementById('cashDetails').style.display = mode === 'Cash' ? 'block' : 'none';
+            if(mode === 'Cash') generateSuggestions();
+        }
+
+        function generateSuggestions() {
+            const total = parseFloat(document.getElementById('grandTotal').innerText.replace(/[₹,]/g,''));
+            const suggests = [
+                Math.ceil(total / 50) * 50,
+                Math.ceil(total / 100) * 100,
+                Math.ceil(total / 500) * 500,
+                Math.ceil(total / 2000) * 2000
+            ];
+            const unique = [...new Set(suggests)].filter(v => v >= total);
+            document.getElementById('cashSuggestions').innerHTML = unique.map(v => `
+                <button onclick="fillCash(${v})" class="bg-white border-2 border-blue-200 text-blue-600 px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap hover:bg-blue-600 hover:text-white transition">₹${v}</button>
+            `).join('');
+        }
+
+        function fillCash(val) {
+            document.getElementById('cashReceived').value = val;
+            updateChange();
+        }
+
+        function updateChange() {
+            const total = parseFloat(document.getElementById('grandTotal').innerText.replace(/[₹,]/g,''));
+            const received = parseFloat(document.getElementById('cashReceived').value) || 0;
+            const change = received - total;
+            document.getElementById('paymentChangeDisplay').innerText = "₹" + (change > 0 ? change.toLocaleString() : "0");
+        }
+
+        function updatePaymentSummary() {
+            const list = document.getElementById('paymentSummaryList');
+            const totalDisplay = document.getElementById('paymentTotalDisplay');
+            const total = document.getElementById('grandTotal').innerText;
+            
+            list.innerHTML = cart.map(item => `
+                <div class="flex justify-between border-b border-gray-700 pb-2 italic opacity-90">
+                    <span>${item.name} x ${item.qty}</span>
+                    <span class="font-bold">₹${(item.price * item.qty).toLocaleString()}</span>
+                </div>
+            `).join('');
+            totalDisplay.innerText = total;
+        }
+
+        function finalizeSale() {
+            // Deduct Stock
+            cart.forEach(cItem => {
+                const stockItem = inventory.find(i => i.barcode === cItem.barcode);
+                if(stockItem) stockItem.stock -= cItem.qty;
+            });
+
+            // Save History
+            const finalAmount = parseFloat(document.getElementById('grandTotal').innerText.replace(/[₹,]/g,''));
+            salesHistory.push({
+                date: new Date().toISOString(),
+                total: finalAmount,
+                itemCount: cart.reduce((s, i) => s + i.qty, 0),
+                payment: currentPaymentMode
+            });
+
+            localStorage.setItem('DSM_Stock', JSON.stringify(inventory));
+            localStorage.setItem('DSM_Sales', JSON.stringify(salesHistory));
+
+            // Prepare and Execute Print
+            preparePrint();
+            window.print();
+
+            // Redirect & Reset
+            resetAll();
+        }
+
+        function resetAll() {
+            cart = [];
+            document.getElementById('discountInput').value = 0;
+            document.getElementById('cashReceived').value = "";
+            document.getElementById('paymentChangeDisplay').innerText = "₹0";
+            backToSales();
+            updateUI();
+            renderCatalog();
+            checkLowStock();
+        }
+
+        function preparePrint() {
+            const list = document.getElementById('printItemsList');
+            list.innerHTML = cart.map(i => `<div>${i.name} x ${i.qty} - ₹${(i.price*i.qty).toLocaleString()}</div>`).join('');
+            document.getElementById('printSubtotal').innerText = "Subtotal: " + document.getElementById('subTotal').innerText;
+            document.getElementById('printDiscount').innerText = "Discount: " + document.getElementById('discountInput').value + "%";
+            document.getElementById('printPayMode').innerText = "Payment Mode: " + currentPaymentMode;
+            document.getElementById('printTotal').innerText = "GRAND TOTAL: " + document.getElementById('grandTotal').innerText;
+        }
+
+        // --- CORE DSM FUNCTIONS ---
+        function updateCartQty(barcode, change) {
+            const item = inventory.find(i => i.barcode === barcode);
+            const cartIndex = cart.findIndex(c => c.barcode === barcode);
+            if (change > 0) {
+                if (item.stock <= (cart[cartIndex]?.qty || 0)) return alert("Out of stock!");
+                if (cartIndex > -1) cart[cartIndex].qty += 1;
+                else cart.push({ barcode, qty: 1, name: item.name_en, price: item.price, telugu: item.name_te });
+            } else if (cartIndex > -1) {
+                cart[cartIndex].qty -= 1;
+                if (cart[cartIndex].qty <= 0) cart.splice(cartIndex, 1);
+            }
+            updateUI(); renderCatalog();
+        }
+
+        function updateUI() {
+            const display = document.getElementById('cartItems');
+            if (cart.length === 0) display.innerHTML = '<p class="text-center text-gray-300 italic mt-10 text-sm font-black">Cart is empty</p>';
+            else display.innerHTML = cart.map(i => `<div class="flex justify-between items-center bg-gray-50 p-2 rounded-xl border-b mb-1"><div class="text-xs"><b>${i.name}</b><br><small class="telugu">${i.telugu}</small></div><b>₹${(i.price*i.qty).toLocaleString()}</b></div>`).join('');
+            calculateTotal();
+        }
+
+        function renderCatalog() {
+            const grid = document.getElementById('productGrid');
+            const filtered = currentCategory === 'All' ? inventory : inventory.filter(p => p.category === currentCategory);
+            grid.innerHTML = filtered.map(p => {
+                const cartItem = cart.find(c => c.barcode === p.barcode);
+                return `<div class="bg-white rounded-3xl p-5 shadow-sm border ${p.stock < 5 ? 'border-red-300 bg-red-50' : 'hover:border-orange-500'} flex flex-col justify-between">
+                    <div><span class="text-[10px] bg-gray-100 px-2 py-1 rounded font-bold uppercase">${p.category}</span>
+                    <h4 class="font-bold text-gray-800 text-sm mt-2">${p.name_en}</h4><p class="telugu text-orange-600 text-xs mb-2">${p.name_te}</p>
+                    <p class="text-xl font-black">₹${p.price.toLocaleString()}</p></div>
+                    <div class="flex items-center justify-between bg-gray-100 rounded-2xl p-1 no-print">
+                        <button onclick="updateCartQty('${p.barcode}', -1)" class="w-8 h-8 bg-white rounded-xl shadow-sm font-black">-</button>
+                        <span class="font-black text-sm">${cartItem ? cartItem.qty : 0}</span>
+                        <button onclick="updateCartQty('${p.barcode}', 1)" class="w-8 h-8 bg-orange-600 text-white rounded-xl shadow-sm font-black">+</button>
+                    </div></div>`;
+            }).join('');
+        }
+
+        function showReports() {
+            document.getElementById('reportsModal').classList.remove('hidden'); document.getElementById('reportsModal').classList.add('flex');
+            const today = salesHistory.filter(s => new Date(s.date).toDateString() === new Date().toDateString());
+            document.getElementById('todayTotal').innerText = "₹" + today.reduce((s, x) => s + x.total, 0).toLocaleString();
+            document.getElementById('cashTotal').innerText = "₹" + today.filter(s => s.payment === 'Cash').reduce((s, x) => s + x.total, 0).toLocaleString();
+            document.getElementById('upiTotal').innerText = "₹" + today.filter(s => s.payment === 'UPI').reduce((s, x) => s + x.total, 0).toLocaleString();
+            document.getElementById('itemsSoldTotal').innerText = today.reduce((s, x) => s + x.itemCount, 0);
+            document.getElementById('inventoryReport').innerHTML = inventory.map(i => `<div class="flex justify-between border-b py-2 italic font-black"><span>${i.name_en}</span><span class="${i.stock < 5 ? 'text-red-600' : ''}">${i.stock} LEFT</span></div>`).join('');
+            document.getElementById('salesLog').innerHTML = salesHistory.slice(-10).reverse().map(s => `<div class="flex justify-between bg-gray-50 p-1 rounded mb-1"><span>${new Date(s.date).toLocaleTimeString()} (${s.payment})</span><b>₹${s.total.toLocaleString()}</b></div>`).join('');
+        }
+
+        function addNewProduct() {
+            const bc = document.getElementById('in_barcode').value;
+            const existing = inventory.find(i => i.barcode === bc);
+            if(existing) existing.stock += parseInt(document.getElementById('in_stock').value);
+            else inventory.push({ category: document.getElementById('in_category').value, barcode: bc, name_en: document.getElementById('in_name_en').value, name_te: document.getElementById('in_name_te').value, price: parseFloat(document.getElementById('in_price').value), stock: parseInt(document.getElementById('in_stock').value) });
+            saveData(); toggleAdmin(); checkLowStock();
+        }
+
+        function deleteProduct() {
+            if(confirm("Delete product?")) { inventory = inventory.filter(i => i.barcode !== document.getElementById('del_barcode').value); saveData(); }
+        }
+
+        function checkLowStock() {
+            const low = inventory.filter(i => i.stock < 5);
+            if(low.length > 0) { document.getElementById('lowStockNotify').classList.remove('hidden'); document.getElementById('lowStockText').innerText = low.length + " items low!"; }
+        }
+
+        function downloadCSV() {
+            let csv = "Date,Mode,Total\n" + salesHistory.map(s => `${s.date},${s.payment},${s.total}`).join("\n");
+            const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURI(csv); a.download = 'DSM_Sales.csv'; a.click();
+        }
+
+        function toggleAdmin() { document.getElementById('adminModal').classList.toggle('hidden'); document.getElementById('adminModal').classList.toggle('flex'); }
+        function closeReports() { document.getElementById('reportsModal').classList.add('hidden'); }
+        function closeNotify() { document.getElementById('lowStockNotify').classList.add('hidden'); }
+        function filterCategory(cat) { currentCategory = cat; document.querySelectorAll('nav button').forEach(b => b.classList.remove('active-tab')); document.getElementById('tab-'+cat).classList.add('active-tab'); renderCatalog(); }
+        function saveData() { localStorage.setItem('DSM_Stock', JSON.stringify(inventory)); renderCatalog(); }
+
+        window.onload = () => { renderCatalog(); checkLowStock(); };
+    </script>
+</body>
+</html>
